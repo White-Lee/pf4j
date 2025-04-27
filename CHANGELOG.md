@@ -12,6 +12,59 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 #### Removed
 
+### [3.13.0] - 2024-11-29
+
+#### Fixed
+- [#595]: Fix StackOverFlow error on Kotlin classes without @Extension
+
+#### Changed
+- [#594]: Always check for ClassLoaders differences in AbstractExtensionFinder
+
+### [3.12.1] - 2024-10-12
+
+#### Fixed
+- [#586]: Plugin Extensions should be detected with any ClassLoadingStrategy
+- [#590]: Fix fire PluginStateEvent for STOPPED state
+
+### [3.12.0] - 2024-06-25
+
+#### Fixed
+- [#576]: Error due to incorrect dependency update after plugin deletion
+
+#### Changed
+- [#584]: Consolidate demo projects in the 'demo' directory
+- Upgrade Mockito to 5.2.0
+
+#### Added
+- Add PluginClassLoader#isClosed method
+
+### [3.11.1] - 2024-05-19
+
+#### Fixed
+- [#574]: Plugin status can‘t change from STARTED to DISABLED
+- [#582]: Remove 'final' for AbstractPluginManager.getResolveRecoveryStrategy method
+
+### [3.11.0] - 2024-03-06
+
+#### Fixed
+- [#520]: Call stopPlugin only for started plugin
+- [#546]: Unload broken plugins
+- [#561]: Fix the problem of unable doing sonar scanning in JDK 11
+- [#563]: Method AbstractPluginManager#loadPlugins logs and return silently for resolve plugins errors
+- [#568]: Fix maven warning about plugin version
+- Ignore fire plugin state event without state change
+
+#### Changed
+- [#560]: Upgrade Java SemVer to 0.10.2
+- [#566]: Make PluginStateEvent fields final
+- Write empty extensions descriptor even if no extensions are found
+
+#### Added
+- [#564]: Add strategy for handling the recovery of a plugin that could not be resolved
+- [#565]: Add support for coverage in sonar
+- [#567]: Post PluginState.UNLOADED event when plugins are unloaded
+- Add InvalidPluginDescriptorException
+
 ### [3.10.0] - 2023-09-06
 
 #### Fixed
@@ -417,7 +470,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - [#41]: Added plugin archive source abstraction
 - Added test for DefaultPluginRepository
 
-[unreleased]: https://github.com/decebals/pf4j/compare/release-3.10.0...HEAD
+[unreleased]: https://github.com/decebals/pf4j/compare/release-3.12.1...HEAD
+[3.13.0]: https://github.com/decebals/pf4j/compare/release-3.12.1...release-3.13.0
+[3.12.1]: https://github.com/decebals/pf4j/compare/release-3.12.0...release-3.12.1
+[3.12.0]: https://github.com/decebals/pf4j/compare/release-3.11.1...release-3.12.0
+[3.11.1]: https://github.com/decebals/pf4j/compare/release-3.11.0...release-3.11.1
+[3.11.0]: https://github.com/decebals/pf4j/compare/release-3.10.0...release-3.11.0
 [3.10.0]: https://github.com/decebals/pf4j/compare/release-3.9.0...release-3.10.0
 [3.9.0]: https://github.com/decebals/pf4j/compare/release-3.8.0...release-3.9.0
 [3.8.0]: https://github.com/decebals/pf4j/compare/release-3.7.0...release-3.8.0
@@ -448,9 +506,27 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 [0.11.0]: https://github.com/decebals/pf4j/compare/release-0.10.0...release-0.11.0
 [0.10.0]: https://github.com/decebals/pf4j/compare/release-0.9.0...release-0.10.0
 
+[#595]: https://github.com/pf4j/pf4j/pull/595
+[#594]: https://github.com/pf4j/pf4j/issues/594
+[#590]: https://github.com/pf4j/pf4j/issues/590
+[#586]: https://github.com/pf4j/pf4j/pull/586
+[#584]: https://github.com/pf4j/pf4j/pull/584
+[#582]: https://github.com/pf4j/pf4j/issues/582
+[#576]: https://github.com/pf4j/pf4j/issues/576
+[#574]: https://github.com/pf4j/pf4j/issues/574
+[#568]: https://github.com/pf4j/pf4j/pull/568
+[#567]: https://github.com/pf4j/pf4j/pull/567
+[#566]: https://github.com/pf4j/pf4j/pull/566
+[#565]: https://github.com/pf4j/pf4j/pull/565
+[#564]: https://github.com/pf4j/pf4j/pull/564
+[#563]: https://github.com/pf4j/pf4j/issues/563
+[#561]: https://github.com/pf4j/pf4j/pull/561
+[#560]: https://github.com/pf4j/pf4j/pull/560
+[#546]: https://github.com/pf4j/pf4j/issues/546
 [#527]: https://github.com/pf4j/pf4j/issues/527
 [#526]: https://github.com/pf4j/pf4j/issues/526
 [#524]: https://github.com/pf4j/pf4j/issues/524
+[#520]: https://github.com/pf4j/pf4j/issues/520
 [#517]: https://github.com/pf4j/pf4j/pull/517
 [#515]: https://github.com/pf4j/pf4j/pull/515
 [#514]: https://github.com/pf4j/pf4j/pull/514

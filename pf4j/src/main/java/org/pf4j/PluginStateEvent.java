@@ -16,14 +16,21 @@
 package org.pf4j;
 
 import java.util.EventObject;
+import java.util.Objects;
 
 /**
+ * Event object that indicates a change in the state of a plugin.
+ * The event is propagated to all registered listeners.
+ * The event source is the {@link PluginManager} that changed the state of the plugin.
+ * The event object contains the plugin that changed its state and the old state.
+ *
+ * @see PluginStateListener
  * @author Decebal Suiu
  */
 public class PluginStateEvent extends EventObject {
 
-    private PluginWrapper plugin;
-    private PluginState oldState;
+    private final PluginWrapper plugin;
+    private final PluginState oldState;
 
     public PluginStateEvent(PluginManager source, PluginWrapper plugin, PluginState oldState) {
         super(source);
@@ -32,19 +39,39 @@ public class PluginStateEvent extends EventObject {
         this.oldState = oldState;
     }
 
+    /**
+     * The object on which the Event initially occurred.
+     *
+     * @return the PluginManager that changed the state of the plugin
+     */
     @Override
     public PluginManager getSource() {
         return (PluginManager) super.getSource();
     }
 
+    /**
+     * The plugin that changed its state.
+     *
+     * @return the plugin that changed its state
+     */
     public PluginWrapper getPlugin() {
         return plugin;
     }
 
+    /**
+     * The new state of the plugin.
+     *
+     * @return the new state of the plugin
+     */
     public PluginState getPluginState() {
         return plugin.getPluginState();
     }
 
+    /**
+     * The old state of the plugin.
+     *
+     * @return the old state of the plugin
+     */
     public PluginState getOldState() {
         return oldState;
     }
@@ -55,6 +82,19 @@ public class PluginStateEvent extends EventObject {
                 ", newState=" + getPluginState() +
                 ", oldState=" + oldState +
                 ']';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PluginStateEvent that = (PluginStateEvent) o;
+        return Objects.equals(plugin, that.plugin) && oldState == that.oldState;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(plugin, oldState);
     }
 
 }

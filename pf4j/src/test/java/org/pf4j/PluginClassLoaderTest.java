@@ -20,27 +20,39 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.pf4j.processor.LegacyExtensionStorage;
+import org.pf4j.test.JavaFileObjectUtils;
+import org.pf4j.test.JavaSources;
 import org.pf4j.test.PluginZip;
 import org.pf4j.util.FileUtils;
 
+import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.ref.WeakReference;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Sebastian Lövdahl
  */
-public class PluginClassLoaderTest {
+class PluginClassLoaderTest {
 
     private TestPluginManager pluginManager;
     private TestPluginManager pluginManagerParentFirst;
@@ -53,6 +65,8 @@ public class PluginClassLoaderTest {
     private PluginClassLoader parentLastPluginDependencyClassLoader;
     private PluginClassLoader parentFirstPluginDependencyClassLoader;
 
+    private PluginZip pluginDependencyZip;
+
     @TempDir
     Path pluginsPath;
 
@@ -60,16 +74,18 @@ public class PluginClassLoaderTest {
     static void setUpGlobal() throws IOException, URISyntaxException {
         Path parentClassPathBase = Paths.get(PluginClassLoaderTest.class.getClassLoader().getResource(".").toURI());
 
-        File metaInfFile = parentClassPathBase.resolve("META-INF").toFile();
+        Path metaInfPath = parentClassPathBase.resolve("META-INF");
+        File metaInfFile = metaInfPath.toFile();
         if (metaInfFile.mkdir()) {
             // Only delete the directory if this test created it, guarding for any future usages of the directory.
             metaInfFile.deleteOnExit();
         }
 
-        createFile(parentClassPathBase.resolve("META-INF").resolve("file-only-in-parent"));
-        createFile(parentClassPathBase.resolve("META-INF").resolve("file-in-both-parent-and-dependency-and-plugin"));
-        createFile(parentClassPathBase.resolve("META-INF").resolve("file-in-both-parent-and-dependency"));
-        createFile(parentClassPathBase.resolve("META-INF").resolve("file-in-both-parent-and-plugin"));
+        createFile(metaInfPath.resolve("file-only-in-parent"));
+        createFile(metaInfPath.resolve("file-in-both-parent-and-dependency-and-plugin"));
+        createFile(metaInfPath.resolve("file-in-both-parent-and-dependency"));
+        createFile(metaInfPath.resolve("file-in-both-parent-and-plugin"));
+        createFile(parentClassPathBase.resolve(LegacyExtensionStorage.EXTENSIONS_RESOURCE));
     }
 
     private static void createFile(Path pathToFile) throws IOException {
@@ -87,24 +103,37 @@ public class PluginClassLoaderTest {
         pluginManager = new TestPluginManager(pluginsPath);
         pluginManagerParentFirst = new TestPluginManager(pluginsPath);
 
-        pluginDependencyDescriptor = new DefaultPluginDescriptor();
-        pluginDependencyDescriptor.setPluginId("myDependency");
-        pluginDependencyDescriptor.setPluginVersion("1.2.3");
-        pluginDependencyDescriptor.setPluginDescription("My plugin");
-        pluginDependencyDescriptor.setDependencies("");
-        pluginDependencyDescriptor.setProvider("Me");
-        pluginDependencyDescriptor.setRequires("5.0.0");
+        pluginDependencyDescriptor = new DefaultPluginDescriptor()
+            .setPluginId("myDependency")
+            .setPluginVersion("1.2.3")
+            .setPluginDescription("My plugin")
+            .setDependencies("")
+            .setProvider("Me")
+            .setRequires("5.0.0");
 
+        Map<String, JavaFileObject> generatedClasses = JavaSources.compileAll(JavaSources.GREETING, JavaSources.WHAZZUP_GREETING)
+            .stream()
+            .map(javaFileObject -> new AbstractMap.SimpleEntry<>(JavaFileObjectUtils.getClassName(javaFileObject), javaFileObject))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Path classesPath = Paths.get("classes");
+        Path metaInfPath = classesPath.resolve("META-INF");
+
+        Path greetingClassPath = classesPath.resolve(JavaSources.GREETING_CLASS_NAME.replace('.', '/') + ".class");
+        Path whaszzupGreetingClassPath = classesPath.resolve(JavaSources.WHAZZUP_GREETING_CLASS_NAME.replace('.', '/') + ".class");
 
         Path pluginDependencyPath = pluginsPath.resolve(pluginDependencyDescriptor.getPluginId() + "-" + pluginDependencyDescriptor.getVersion() + ".zip");
-        PluginZip pluginDependencyZip = new PluginZip.Builder(pluginDependencyPath, pluginDependencyDescriptor.getPluginId())
+        pluginDependencyZip = new PluginZip.Builder(pluginDependencyPath, pluginDependencyDescriptor.getPluginId())
                 .pluginVersion(pluginDependencyDescriptor.getVersion())
-                .addFile(Paths.get("classes/META-INF/dependency-file"), "dependency")
-                .addFile(Paths.get("classes/META-INF/file-in-both-parent-and-dependency-and-plugin"), "dependency")
-                .addFile(Paths.get("classes/META-INF/file-in-both-parent-and-dependency"), "dependency")
+                .addFile(metaInfPath.resolve("dependency-file"), "dependency")
+                .addFile(metaInfPath.resolve("file-in-both-parent-and-dependency-and-plugin"), "dependency")
+                .addFile(metaInfPath.resolve("file-in-both-parent-and-dependency"), "dependency")
+                .addFile(classesPath.resolve(LegacyExtensionStorage.EXTENSIONS_RESOURCE), "dependency")
+                .addFile(greetingClassPath, JavaFileObjectUtils.getAllBytes(generatedClasses.get(JavaSources.GREETING_CLASS_NAME)))
+                .addFile(whaszzupGreetingClassPath, JavaFileObjectUtils.getAllBytes(generatedClasses.get(JavaSources.WHAZZUP_GREETING_CLASS_NAME)))
                 .build();
 
-        FileUtils.expandIfZip(pluginDependencyZip.path());
+        pluginDependencyZip.unzip();
 
         PluginClasspath pluginDependencyClasspath = new DefaultPluginClasspath();
 
@@ -113,7 +142,6 @@ public class PluginClassLoaderTest {
 
         pluginManager.addClassLoader(pluginDependencyDescriptor.getPluginId(), parentLastPluginDependencyClassLoader);
         pluginManagerParentFirst.addClassLoader(pluginDependencyDescriptor.getPluginId(), parentFirstPluginDependencyClassLoader);
-
 
         for (String classesDirectory : pluginDependencyClasspath.getClassesDirectories()) {
             File classesDirectoryFile = pluginDependencyZip.unzippedPath().resolve(classesDirectory).toFile();
@@ -125,8 +153,8 @@ public class PluginClassLoaderTest {
             Path jarsDirectoryPath = pluginDependencyZip.unzippedPath().resolve(jarsDirectory);
             List<File> jars = FileUtils.getJars(jarsDirectoryPath);
             for (File jar : jars) {
-            	parentLastPluginDependencyClassLoader.addFile(jar);
-            	parentFirstPluginDependencyClassLoader.addFile(jar);
+                parentLastPluginDependencyClassLoader.addFile(jar);
+                parentFirstPluginDependencyClassLoader.addFile(jar);
             }
         }
 
@@ -141,12 +169,13 @@ public class PluginClassLoaderTest {
         Path pluginPath = pluginsPath.resolve(pluginDescriptor.getPluginId() + "-" + pluginDescriptor.getVersion() + ".zip");
         PluginZip pluginZip = new PluginZip.Builder(pluginPath, pluginDescriptor.getPluginId())
                 .pluginVersion(pluginDescriptor.getVersion())
-                .addFile(Paths.get("classes/META-INF/plugin-file"), "plugin")
-                .addFile(Paths.get("classes/META-INF/file-in-both-parent-and-dependency-and-plugin"), "plugin")
-                .addFile(Paths.get("classes/META-INF/file-in-both-parent-and-plugin"), "plugin")
+                .addFile(metaInfPath.resolve("plugin-file"), "plugin")
+                .addFile(metaInfPath.resolve("file-in-both-parent-and-dependency-and-plugin"), "plugin")
+                .addFile(metaInfPath.resolve("file-in-both-parent-and-plugin"), "plugin")
+                .addFile(classesPath.resolve(LegacyExtensionStorage.EXTENSIONS_RESOURCE), "plugin")
                 .build();
 
-        FileUtils.expandIfZip(pluginZip.path());
+        pluginZip.unzip();
 
         PluginClasspath pluginClasspath = new DefaultPluginClasspath();
 
@@ -321,6 +350,52 @@ public class PluginClassLoaderTest {
         assertNumberOfResourcesAndFirstLineOfFirstElement(3, "parent", resources);
     }
 
+    @Test
+    void parentFirstGetExtensionsIndexExistsInParentAndDependencyAndPlugin() throws URISyntaxException, IOException {
+        URL resource = parentLastPluginClassLoader.getResource(LegacyExtensionFinder.EXTENSIONS_RESOURCE);
+        assertFirstLine("plugin", resource);
+    }
+
+    @Test
+    void parentLastGetExtensionsIndexExistsInParentAndDependencyAndPlugin() throws URISyntaxException, IOException {
+        URL resource = parentLastPluginClassLoader.getResource(LegacyExtensionFinder.EXTENSIONS_RESOURCE);
+        assertFirstLine("plugin", resource);
+    }
+
+    @Test
+    void isClosed() throws IOException {
+        parentLastPluginClassLoader.close();
+        assertTrue(parentLastPluginClassLoader.isClosed());
+    }
+
+    @Test
+    void collectClassLoader() throws IOException, ClassNotFoundException, InterruptedException {
+        // Create a new classloader
+        PluginClassLoader classLoader = new PluginClassLoader(pluginManager, pluginDependencyDescriptor, PluginClassLoaderTest.class.getClassLoader());
+        PluginClasspath pluginDependencyClasspath = new DefaultPluginClasspath();
+        for (String classesDirectory : pluginDependencyClasspath.getClassesDirectories()) {
+            File classesDirectoryFile = pluginDependencyZip.unzippedPath().resolve(classesDirectory).toFile();
+            classLoader.addFile(classesDirectoryFile);
+        }
+
+        WeakReference<PluginClassLoader> weakRef = new WeakReference<>(classLoader);
+
+        // Use the classloader
+        classLoader.loadClass(JavaSources.GREETING_CLASS_NAME);
+
+        // Clear strong reference
+        classLoader.close();
+        classLoader = null;
+
+        // Try to force GC
+        System.gc();
+        System.runFinalization();
+        Thread.sleep(100); // Give GC a chance to run
+
+        // Check if ClassLoader was collected
+        assertNull(weakRef.get(), "ClassLoader was not garbage collected");
+    }
+
     private static void assertFirstLine(String expected, URL resource) throws URISyntaxException, IOException {
         assertNotNull(resource);
         assertEquals(expected, Files.readAllLines(Paths.get(resource.toURI())).get(0));
@@ -334,14 +409,16 @@ public class PluginClassLoaderTest {
         assertEquals(expectedFirstLine, Files.readAllLines(Paths.get(firstResource.toURI())).get(0));
     }
 
-    class TestPluginManager extends DefaultPluginManager {
+    static class TestPluginManager extends DefaultPluginManager {
 
-    	public TestPluginManager(Path pluginsPath) {
-			super(pluginsPath);
-		}
+        public TestPluginManager(Path pluginsPath) {
+            super(pluginsPath);
+        }
 
-		void addClassLoader(String pluginId, PluginClassLoader classLoader) {
-    		getPluginClassLoaders().put(pluginId, classLoader);
-    	}
+        void addClassLoader(String pluginId, PluginClassLoader classLoader) {
+            getPluginClassLoaders().put(pluginId, classLoader);
+        }
+
     }
+
 }

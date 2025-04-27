@@ -4,13 +4,13 @@ Plugin Framework for Java (PF4J)
 =====================
 [![Join the chat at https://gitter.im/decebals/pf4j](https://badges.gitter.im/decebals/pf4j.svg)](https://gitter.im/decebals/pf4j?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![GitHub Actions Status](https://github.com/pf4j/pf4j/actions/workflows/build.yml/badge.svg)](https://github.com/pf4j/pf4j/actions/workflows/build.yml)
-[![Coverage Status](https://coveralls.io/repos/pf4j/pf4j/badge.svg?branch=master&service=github)](https://coveralls.io/github/pf4j/pf4j?branch=master)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=pf4j_pf4j&metric=coverage)](https://sonarcloud.io/summary/new_code?id=pf4j_pf4j)
 [![Maven Central](http://img.shields.io/maven-central/v/org.pf4j/pf4j.svg)](http://search.maven.org/#search|ga|1|pf4j)
 
 A plugin is a way for a third party to extend the functionality of an application. A plugin implements extension points
 declared by application or other plugins. Also, a plugin can define extension points.  
 
-**NOTE:** Starting with version 0.9 you can define an extension directly in the application jar (you're not obligated to put the extension in a plugin - you can see this extension as a default/system extension). See [WhazzupGreeting](https://github.com/pf4j/pf4j/blob/master/demo/app/src/main/java/org/pf4j/demo/WhazzupGreeting.java) for a real example.  
+**NOTE:** Starting with version 0.9 you can define an extension directly in the application jar (you're not obligated to put the extension in a plugin - you can see this extension as a default/system extension). See [WhazzupGreeting](https://github.com/pf4j/pf4j/blob/master/demo/gradle/app/src/main/java/org/pf4j/demo/WhazzupGreeting.java) for a real example.  
 
 Features/Benefits
 -------------------
@@ -159,3 +159,9 @@ Quickstart (call to action)
 1. Read this file to have an overview about what this project does
 2. Read [Getting started](https://pf4j.org/doc/getting-started.html) section of documentation to understand the basic concepts
 3. Read [Quickstart](https://pf4j.org/dev/quickstart.html) section of documentation to create your first PF4J-based modular application
+
+Credits
+-------
+Many thanks to:
+* [JetBrains](https://www.jetbrains.com) for their free OpenSource license
+* [JProfiler](https://www.ej-technologies.com/jprofiler) for their free OpenSource license

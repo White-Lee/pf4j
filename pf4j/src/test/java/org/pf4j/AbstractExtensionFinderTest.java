@@ -15,6 +15,7 @@
  */
 package org.pf4j;
 
+import kotlin.sequences.Sequence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,13 +36,14 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * @author Mario Franco
  */
-public class AbstractExtensionFinderTest {
+class AbstractExtensionFinderTest {
 
     private PluginManager pluginManager;
 
@@ -71,7 +73,7 @@ public class AbstractExtensionFinderTest {
      * Test of {@link AbstractExtensionFinder#find(Class)}.
      */
     @Test
-    public void testFindFailType() {
+    void testFindFailType() {
         ExtensionFinder instance = new AbstractExtensionFinder(pluginManager) {
 
             @Override
@@ -93,7 +95,7 @@ public class AbstractExtensionFinderTest {
      * Test of {@link AbstractExtensionFinder#find(Class)}.
      */
     @Test
-    public void testFindFromClasspath() {
+    void testFindFromClasspath() {
         ExtensionFinder instance = new AbstractExtensionFinder(pluginManager) {
 
             @Override
@@ -122,7 +124,7 @@ public class AbstractExtensionFinderTest {
      * Test of {@link AbstractExtensionFinder#find(Class, String)}.
      */
     @Test
-    public void testFindFromPlugin() {
+    void testFindFromPlugin() {
         ExtensionFinder instance = new AbstractExtensionFinder(pluginManager) {
 
             @Override
@@ -161,7 +163,7 @@ public class AbstractExtensionFinderTest {
      * Test of {@link AbstractExtensionFinder#findClassNames(String)}.
      */
     @Test
-    public void testFindClassNames() {
+    void testFindClassNames() {
         ExtensionFinder instance = new AbstractExtensionFinder(pluginManager) {
 
             @Override
@@ -200,7 +202,7 @@ public class AbstractExtensionFinderTest {
      * Test of {@link org.pf4j.AbstractExtensionFinder#find(java.lang.String)}.
      */
     @Test
-    public void testFindExtensionWrappersFromPluginId() {
+    void testFindExtensionWrappersFromPluginId() {
         // complicate the test to show hot to deal with dynamic Java classes (generated at runtime from sources)
         PluginWrapper plugin3 = mock(PluginWrapper.class);
         JavaFileObject object = JavaSources.compile(DefaultExtensionFactoryTest.FailTestExtension);
@@ -251,27 +253,59 @@ public class AbstractExtensionFinderTest {
     }
 
     @Test
-    public void findExtensionAnnotation() {
-        List<JavaFileObject> generatedFiles = JavaSources.compileAll(JavaSources.Greeting, JavaSources.WhazzupGreeting);
+    void findExtensionAnnotation() {
+        List<JavaFileObject> generatedFiles = JavaSources.compileAll(JavaSources.GREETING, JavaSources.WHAZZUP_GREETING);
         assertEquals(2, generatedFiles.size());
 
         Map<String, Class<?>> loadedClasses = new JavaFileObjectClassLoader().load(generatedFiles);
-        Class<?> clazz = loadedClasses.get("test.WhazzupGreeting");
+        Class<?> clazz = loadedClasses.get(JavaSources.WHAZZUP_GREETING_CLASS_NAME);
         Extension extension = AbstractExtensionFinder.findExtensionAnnotation(clazz);
         Assertions.assertNotNull(extension);
     }
 
     @Test
-    public void findExtensionAnnotationThatMissing() {
-        List<JavaFileObject> generatedFiles = JavaSources.compileAll(JavaSources.Greeting,
+    void findExtensionAnnotationThatMissing() {
+        List<JavaFileObject> generatedFiles = JavaSources.compileAll(JavaSources.GREETING,
             ExtensionAnnotationProcessorTest.SpinnakerExtension_NoExtension,
             ExtensionAnnotationProcessorTest.WhazzupGreeting_SpinnakerExtension);
         assertEquals(3, generatedFiles.size());
 
         Map<String, Class<?>> loadedClasses = new JavaFileObjectClassLoader().load(generatedFiles);
-        Class<?> clazz = loadedClasses.get("test.WhazzupGreeting");
+        Class<?> clazz = loadedClasses.get(JavaSources.WHAZZUP_GREETING_CLASS_NAME);
         Extension extension = AbstractExtensionFinder.findExtensionAnnotation(clazz);
         Assertions.assertNull(extension);
+    }
+
+    // This is a regression test, as this caused an StackOverflowError with the previous implementation
+    @Test
+    public void runningOnNonExtensionKotlinClassDoesNotThrowException() {
+        Extension result = AbstractExtensionFinder.findExtensionAnnotation(Sequence.class);
+
+        Assertions.assertNull(result);
+    }
+
+    @Test
+    void checkDifferentClassLoaders() {
+        AbstractExtensionFinder extensionFinder = new AbstractExtensionFinder(pluginManager) {
+
+            @Override
+            public Map<String, Set<String>> readPluginsStorages() {
+                return Collections.emptyMap();
+            }
+
+            @Override
+            public Map<String, Set<String>> readClasspathStorages() {
+                return Collections.emptyMap();
+            }
+
+        };
+
+        List<JavaFileObject> generatedFiles = JavaSources.compileAll(JavaSources.GREETING, JavaSources.WHAZZUP_GREETING);
+        assertEquals(2, generatedFiles.size());
+        Class<?> extensionPointClass = new JavaFileObjectClassLoader().load(generatedFiles).get(JavaSources.GREETING_CLASS_NAME);
+        Class<?> extensionClass = new JavaFileObjectClassLoader().load(generatedFiles).get(JavaSources.WHAZZUP_GREETING_CLASS_NAME);
+
+        assertTrue(extensionFinder.checkDifferentClassLoaders(extensionPointClass, extensionClass));
     }
 
 }

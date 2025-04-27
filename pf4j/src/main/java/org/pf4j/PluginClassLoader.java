@@ -30,8 +30,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * One instance of this class should be created by plugin manager for every available plug-in.
- * By default, this class loader is a Parent Last ClassLoader - it loads the classes from the plugin's jars
+ * One instance of this class should be created for every available plug-in.
+ * It's responsible for loading classes and resources from the plug-in.
+ * <p>
+ * By default, this {@link ClassLoader} is a Parent Last ClassLoader - it loads the classes from the plugin's jars
  * before delegating to the parent class loader.
  * Use {@link #classLoadingStrategy} to change the loading strategy.
  *
@@ -44,18 +46,21 @@ public class PluginClassLoader extends URLClassLoader {
     private static final String JAVA_PACKAGE_PREFIX = "java.";
     private static final String PLUGIN_PACKAGE_PREFIX = "org.pf4j.";
 
-    private PluginManager pluginManager;
-    private PluginDescriptor pluginDescriptor;
-    private ClassLoadingStrategy classLoadingStrategy;
+    private final PluginManager pluginManager;
+    private final PluginDescriptor pluginDescriptor;
+    private final ClassLoadingStrategy classLoadingStrategy;
+    private boolean closed;
 
     public PluginClassLoader(PluginManager pluginManager, PluginDescriptor pluginDescriptor, ClassLoader parent) {
         this(pluginManager, pluginDescriptor, parent, ClassLoadingStrategy.PDA);
     }
 
     /**
+     * Creates a new {@link PluginClassLoader} for the given plugin using parent first strategy.
+     *
      * @deprecated Replaced by {@link #PluginClassLoader(PluginManager, PluginDescriptor, ClassLoader, ClassLoadingStrategy)}.
      * If {@code parentFirst} is {@code true}, indicates that the parent {@link ClassLoader} should be consulted
-     * before trying to load the a class through this loader.
+     * before trying to load a class through this loader.
      */
     @Deprecated
     public PluginClassLoader(PluginManager pluginManager, PluginDescriptor pluginDescriptor, ClassLoader parent, boolean parentFirst) {
@@ -63,7 +68,12 @@ public class PluginClassLoader extends URLClassLoader {
     }
 
     /**
-     * classloading according to {@code classLoadingStrategy}
+     * Creates a new {@link PluginClassLoader} for the given plugin using the specified class loading strategy.
+     *
+     * @param pluginManager the plugin manager
+     * @param pluginDescriptor the plugin descriptor
+     * @param parent the parent class loader
+     * @param classLoadingStrategy the strategy to use for loading classes and resources
      */
     public PluginClassLoader(PluginManager pluginManager, PluginDescriptor pluginDescriptor, ClassLoader parent, ClassLoadingStrategy classLoadingStrategy) {
         super(new URL[0], parent);
@@ -73,12 +83,22 @@ public class PluginClassLoader extends URLClassLoader {
         this.classLoadingStrategy = classLoadingStrategy;
     }
 
+    /**
+     * Adds the specified URL to the search path for classes and resources.
+     *
+     * @param url the URL to be added to the search path of URLs
+     */
     @Override
     public void addURL(URL url) {
         log.debug("Add '{}'", url);
         super.addURL(url);
     }
 
+    /**
+     * Adds the specified file to the search path for classes and resources.
+     *
+     * @param file the file to be added to the search path of URLs
+     */
     public void addFile(File file) {
         try {
             addURL(file.getCanonicalFile().toURI().toURL());
@@ -89,10 +109,15 @@ public class PluginClassLoader extends URLClassLoader {
     }
 
     /**
+     * Loads the class with the specified name.
+     * <p>
      * By default, it uses a child first delegation model rather than the standard parent first.
      * If the requested class cannot be found in this class loader, the parent class loader will be consulted
      * via the standard {@link ClassLoader#loadClass(String)} mechanism.
      * Use {@link #classLoadingStrategy} to change the loading strategy.
+     *
+     * @param className the name of the class
+     * @return the loaded class
      */
     @Override
     public Class<?> loadClass(String className) throws ClassNotFoundException {
@@ -146,7 +171,8 @@ public class PluginClassLoader extends URLClassLoader {
     }
 
     /**
-     * Load the named resource from this plugin.
+     * Loads the named resource from this plugin.
+     * <p>
      * By default, this implementation checks the plugin's classpath first then delegates to the parent.
      * Use {@link #classLoadingStrategy} to change the loading strategy.
      *
@@ -155,8 +181,9 @@ public class PluginClassLoader extends URLClassLoader {
      */
     @Override
     public URL getResource(String name) {
+        ClassLoadingStrategy loadingStrategy = getClassLoadingStrategy(name);
         log.trace("Received request to load resource '{}'", name);
-        for (ClassLoadingStrategy.Source classLoadingSource : classLoadingStrategy.getSources()) {
+        for (ClassLoadingStrategy.Source classLoadingSource : loadingStrategy.getSources()) {
             URL url = null;
             switch (classLoadingSource) {
                 case APPLICATION:
@@ -184,9 +211,9 @@ public class PluginClassLoader extends URLClassLoader {
     @Override
     public Enumeration<URL> getResources(String name) throws IOException {
         List<URL> resources = new ArrayList<>();
-
+        ClassLoadingStrategy loadingStrategy = getClassLoadingStrategy(name);
         log.trace("Received request to load resources '{}'", name);
-        for (ClassLoadingStrategy.Source classLoadingSource : classLoadingStrategy.getSources()) {
+        for (ClassLoadingStrategy.Source classLoadingSource : loadingStrategy.getSources()) {
             switch (classLoadingSource) {
                 case APPLICATION:
                     if (getParent() != null) {
@@ -205,6 +232,41 @@ public class PluginClassLoader extends URLClassLoader {
         return Collections.enumeration(resources);
     }
 
+    private ClassLoadingStrategy getClassLoadingStrategy(String name) {
+        ClassLoadingStrategy loadingStrategy = classLoadingStrategy;
+        if (LegacyExtensionFinder.EXTENSIONS_RESOURCE.equals(name)) {
+            loadingStrategy = ClassLoadingStrategy.PAD;
+        }
+        return loadingStrategy;
+    }
+
+    /**
+     * Closes this class loader.
+     * <p>
+     * This method should be called when the class loader is no longer needed.
+     */
+    @Override
+    public void close() throws IOException {
+        super.close();
+
+        closed = true;
+    }
+
+    /**
+     * Returns whether this class loader has been closed.
+     *
+     * @return {@code true} if this class loader has been closed, {@code false} otherwise
+     */
+    public boolean isClosed() {
+        return closed;
+    }
+
+    /**
+     * Loads the class with the specified name from the dependencies of the plugin.
+     *
+     * @param className the name of the class
+     * @return the loaded class
+     */
     protected Class<?> loadClassFromDependencies(String className) {
         log.trace("Search in dependencies for class '{}'", className);
         List<PluginDependency> dependencies = pluginDescriptor.getDependencies();
@@ -226,6 +288,12 @@ public class PluginClassLoader extends URLClassLoader {
         return null;
     }
 
+    /**
+     * Finds the resource with the given name in the dependencies of the plugin.
+     *
+     * @param name the name of the resource
+     * @return the URL to the resource, {@code null} if the resource was not found
+     */
     protected URL findResourceFromDependencies(String name) {
         log.trace("Search in dependencies for resource '{}'", name);
         List<PluginDependency> dependencies = pluginDescriptor.getDependencies();
@@ -246,6 +314,13 @@ public class PluginClassLoader extends URLClassLoader {
         return null;
     }
 
+    /**
+     * Finds all resources with the given name in the dependencies of the plugin.
+     *
+     * @param name the name of the resource
+     * @return an enumeration of {@link URL} objects for the resource
+     * @throws IOException if I/O errors occur
+     */
     protected Collection<URL> findResourcesFromDependencies(String name) throws IOException {
         log.trace("Search in dependencies for resources '{}'", name);
         List<URL> results = new ArrayList<>();

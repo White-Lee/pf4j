@@ -16,6 +16,14 @@
 package org.pf4j;
 
 /**
+ * The state of a plugin.
+ * <p>
+ * Lifecycle of a plugin:
+ * <pre>
+ * CREATED -> RESOLVED -> STARTED -> STOPPED -> UNLOADED
+ * CREATED -> DISABLED
+ * CREATED -> FAILED
+ *
  * @author Decebal Suiu
  */
 public enum PluginState {
@@ -49,16 +57,72 @@ public enum PluginState {
     /**
      * Plugin failed to start.
      */
-    FAILED("FAILED");
+    FAILED("FAILED"),
 
-    private String status;
+    /**
+     * The plugin has been unloaded. After this event has been completed, the plugin's
+     * {@link ClassLoader} will be closed.
+     */
+    UNLOADED("UNLOADED"),
+    ;
 
-    private PluginState(String status) {
+    private final String status;
+
+    PluginState(String status) {
         this.status = status;
     }
 
+    /**
+     * Returns {@code true} if the value is {@link #CREATED}.
+     */
+    public boolean isCreated() {
+        return this == CREATED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #DISABLED}.
+     */
+    public boolean isDisabled() {
+        return this == DISABLED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #RESOLVED}.
+     */
+    public boolean isResolved() {
+        return this == RESOLVED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #STARTED}.
+     */
+    public boolean isStarted() {
+        return this == STARTED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #STOPPED}.
+     */
+    public boolean isStopped() {
+        return this == STOPPED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #FAILED}.
+     */
+    public boolean isFailed() {
+        return this == FAILED;
+    }
+
+    /**
+     * Returns {@code true} if the value is {@link #UNLOADED}.
+     */
+    public boolean isUnloaded() {
+        return this == UNLOADED;
+    }
+
     public boolean equals(String status) {
-    	return (status == null ? false : this.status.equalsIgnoreCase(status));
+        return this.status.equalsIgnoreCase(status);
     }
 
     @Override
@@ -66,13 +130,20 @@ public enum PluginState {
         return status;
     }
 
+    /**
+     * Parse a string to a {@link PluginState}.
+     *
+     * @param string the string to parse
+     * @return the {@link PluginState} or null if the string is not a valid state
+     */
     public static PluginState parse(String string) {
-		for (PluginState status : values()) {
-			if (status.equals(string)) {
-				return status;
-			}
-		}
+        for (PluginState status : values()) {
+            if (status.equals(string)) {
+                return status;
+            }
+        }
 
-		return null;
-	}
+        return null;
+    }
+
 }

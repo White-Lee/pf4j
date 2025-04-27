@@ -30,7 +30,8 @@ import static com.google.testing.compile.Compiler.javac;
  */
 public class JavaSources {
 
-    public static final JavaFileObject Greeting = JavaFileObjects.forSourceLines("Greeting",
+    public static final String GREETING_CLASS_NAME = "test.Greeting";
+    public static final JavaFileObject GREETING = JavaFileObjects.forSourceLines("Greeting",
         "package test;",
         "import org.pf4j.ExtensionPoint;",
         "",
@@ -38,7 +39,8 @@ public class JavaSources {
         "   String getGreeting();",
         "}");
 
-    public static final JavaFileObject WhazzupGreeting = JavaFileObjects.forSourceLines("WhazzupGreeting",
+    public static final String WHAZZUP_GREETING_CLASS_NAME = "test.WhazzupGreeting";
+    public static final JavaFileObject WHAZZUP_GREETING = JavaFileObjects.forSourceLines("WhazzupGreeting",
         "package test;",
         "import org.pf4j.Extension;",
         "",

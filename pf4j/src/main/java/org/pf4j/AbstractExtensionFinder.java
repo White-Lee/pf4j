@@ -88,7 +88,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
 
         if (pluginId != null) {
             PluginWrapper pluginWrapper = pluginManager.getPlugin(pluginId);
-            if (PluginState.STARTED != pluginWrapper.getPluginState()) {
+            if (!pluginWrapper.getPluginState().isStarted()) {
                 return result;
             }
 
@@ -107,7 +107,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
                     // If optional dependencies are used, the class loader might not be able
                     // to load the extension class because of missing optional dependencies.
                     //
-                    // Therefore we're extracting the extension annotation via asm, in order
+                    // Therefore, we're extracting the extension annotation via asm, in order
                     // to extract the required plugins for an extension. Only if all required
                     // plugins are currently available and started, the corresponding
                     // extension is loaded through the class loader.
@@ -121,7 +121,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
                     List<String> missingPluginIds = new ArrayList<>();
                     for (String requiredPluginId : extensionInfo.getPlugins()) {
                         PluginWrapper requiredPlugin = pluginManager.getPlugin(requiredPluginId);
-                        if (requiredPlugin == null || !PluginState.STARTED.equals(requiredPlugin.getPluginState())) {
+                        if (requiredPlugin == null || !requiredPlugin.getPluginState().isStarted()) {
                             missingPluginIds.add(requiredPluginId);
                         }
                     }
@@ -146,8 +146,8 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
                     log.debug("Added extension '{}' with ordinal {}", className, extensionWrapper.getOrdinal());
                 } else {
                     log.trace("'{}' is not an extension for extension point '{}'", className, type.getName());
-                    if (RuntimeMode.DEVELOPMENT.equals(pluginManager.getRuntimeMode())) {
-                        checkDifferentClassLoaders(type, extensionClass);
+                    if (checkDifferentClassLoaders(type, extensionClass)) {
+                        log.error("Different class loaders: '{}' (E) and '{}' (EP)", extensionClass.getClassLoader(), type.getClassLoader());
                     }
                 }
             } catch (ClassNotFoundException | NoClassDefFoundError e) {
@@ -179,7 +179,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
 
         if (pluginId != null) {
             PluginWrapper pluginWrapper = pluginManager.getPlugin(pluginId);
-            if (PluginState.STARTED != pluginWrapper.getPluginState()) {
+            if (!pluginWrapper.getPluginState().isStarted()) {
                 return result;
             }
 
@@ -231,13 +231,13 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
         // clear cache
         entries = null;
 
-        // By default we're assuming, that no checks for extension dependencies are necessary.
+        // By default, we're assuming, that no checks for extension dependencies are necessary.
         //
         // A plugin, that has an optional dependency to other plugins, might lead to unloadable
         // Java classes (NoClassDefFoundError) at application runtime due to possibly missing
-        // dependencies. Therefore we're enabling the check for optional extensions, if the
+        // dependencies. Therefore, we're enabling the check for optional extensions, if the
         // started plugin contains at least one optional plugin dependency.
-        if (checkForExtensionDependencies == null && PluginState.STARTED.equals(event.getPluginState())) {
+        if (checkForExtensionDependencies == null && event.getPluginState().isStarted()) {
             for (PluginDependency dependency : event.getPlugin().getDescriptor().getDependencies()) {
                 if (dependency.isOptional()) {
                     log.debug("Enable check for extension dependencies via ASM.");
@@ -255,7 +255,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
      * <p>
      * This feature is enabled by default, if at least one available plugin makes use of
      * optional plugin dependencies. Those optional plugins might not be available at runtime.
-     * Therefore any extension is checked by default against available plugins before its
+     * Therefore, any extension is checked by default against available plugins before its
      * instantiation.
      * <p>
      * Notice: This feature requires the optional <a href="https://asm.ow2.io/">ASM library</a>
@@ -274,7 +274,7 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
      * <p>
      * This feature is enabled by default, if at least one available plugin makes use of
      * optional plugin dependencies. Those optional plugins might not be available at runtime.
-     * Therefore any extension is checked by default against available plugins before its
+     * Therefore, any extension is checked by default against available plugins before its
      * instantiation.
      * <p>
      * Notice: This feature requires the optional <a href="https://asm.ow2.io/">ASM library</a>
@@ -360,7 +360,12 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
         // search recursively through all annotations
         for (Annotation annotation : clazz.getAnnotations()) {
             Class<? extends Annotation> annotationClass = annotation.annotationType();
-            if (!annotationClass.getName().startsWith("java.lang.annotation")) {
+            if (!annotationClass.getName().startsWith("java.lang.annotation") && !annotationClass.getName().startsWith("kotlin")) {
+                // In case an annotation is annotated with itself,
+                // an example would be @Target, which is ignored by the check above
+                // however, other libraries might do similar things
+                if (annotationClass.equals(clazz)) continue;
+
                 Extension extensionAnnotation = findExtensionAnnotation(annotationClass);
                 if (extensionAnnotation != null) {
                     return extensionAnnotation;
@@ -371,15 +376,13 @@ public abstract class AbstractExtensionFinder implements ExtensionFinder, Plugin
         return null;
     }
 
-    private void checkDifferentClassLoaders(Class<?> type, Class<?> extensionClass) {
+    boolean checkDifferentClassLoaders(Class<?> type, Class<?> extensionClass) {
         ClassLoader typeClassLoader = type.getClassLoader(); // class loader of extension point
         ClassLoader extensionClassLoader = extensionClass.getClassLoader();
         boolean match = ClassUtils.getAllInterfacesNames(extensionClass).contains(type.getSimpleName());
-        if (match && !extensionClassLoader.equals(typeClassLoader)) {
-            // in this scenario the method 'isAssignableFrom' returns only FALSE
-            // see http://www.coderanch.com/t/557846/java/java/FWIW-FYI-isAssignableFrom-isInstance-differing
-            log.error("Different class loaders: '{}' (E) and '{}' (EP)", extensionClassLoader, typeClassLoader);
-        }
+        // in this scenario the method 'isAssignableFrom' returns only FALSE
+        // see http://www.coderanch.com/t/557846/java/java/FWIW-FYI-isAssignableFrom-isInstance-differing
+        return match && extensionClassLoader != typeClassLoader;
     }
 
 }

@@ -134,18 +134,17 @@ public class DefaultPluginDescriptor implements PluginDescriptor {
         return this;
     }
 
-    protected PluginDescriptor setPluginDescription(String pluginDescription) {
+    protected DefaultPluginDescriptor setPluginDescription(String pluginDescription) {
         this.pluginDescription = pluginDescription;
 
         return this;
     }
 
-    protected PluginDescriptor setPluginClass(String pluginClassName) {
+    protected DefaultPluginDescriptor setPluginClass(String pluginClassName) {
         this.pluginClass = pluginClassName;
 
         return this;
     }
-
 
     protected DefaultPluginDescriptor setPluginVersion(String version) {
         this.version = version;
@@ -153,38 +152,43 @@ public class DefaultPluginDescriptor implements PluginDescriptor {
         return this;
     }
 
-    protected PluginDescriptor setProvider(String provider) {
+    protected DefaultPluginDescriptor setProvider(String provider) {
         this.provider = provider;
 
         return this;
     }
 
-    protected PluginDescriptor setRequires(String requires) {
+    protected DefaultPluginDescriptor setRequires(String requires) {
         this.requires = requires;
 
         return this;
     }
 
-    protected PluginDescriptor setDependencies(String dependencies) {
+    protected DefaultPluginDescriptor setDependencies(String dependencies) {
         this.dependencies = new ArrayList<>();
 
         if (dependencies != null) {
             dependencies = dependencies.trim();
             if (!dependencies.isEmpty()) {
-                String[] tokens = dependencies.split(",");
-                for (String dependency : tokens) {
-                    dependency = dependency.trim();
-                    if (!dependency.isEmpty()) {
-                        this.dependencies.add(new PluginDependency(dependency));
-                    }
-                }
+                setDependencies(dependencies.split(","));
             }
         }
 
         return this;
     }
 
-    public PluginDescriptor setLicense(String license) {
+    protected DefaultPluginDescriptor setDependencies(String... dependencies) {
+        for (String dependency : dependencies) {
+            dependency = dependency.trim();
+            if (!dependency.isEmpty()) {
+                this.dependencies.add(new PluginDependency(dependency));
+            }
+        }
+
+        return this;
+    }
+
+    public DefaultPluginDescriptor setLicense(String license) {
         this.license = license;
 
         return this;
@@ -209,4 +213,5 @@ public class DefaultPluginDescriptor implements PluginDescriptor {
     public int hashCode() {
         return Objects.hash(pluginId, pluginDescription, pluginClass, version, requires, provider, dependencies, license);
     }
+
 }
